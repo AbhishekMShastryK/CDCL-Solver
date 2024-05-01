@@ -4,7 +4,7 @@
 
 
 
-## Run Locally
+## Run Locally (Windows)
 
 
 Install python
