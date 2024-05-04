@@ -1,6 +1,7 @@
 import sys
 import random
 import time
+import math
 from pprint import pprint
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Optional, Iterator
@@ -94,6 +95,17 @@ class Assignments(dict):
         # the decision level
         self.dl = 0
 
+        # Variable activities for VSIDS
+        self.var_activities = {}
+
+    def increment_activity(self, variable: int, increment: float):
+        """
+        Increment the activity of a variable.
+        """
+        if variable not in self.var_activities:
+            self.var_activities[variable] = 0.0
+        self.var_activities[variable] += increment
+
     def value(self, literal: Literal) -> bool:
         """
         Return the value of the literal with respect the current assignments.
@@ -130,7 +142,10 @@ def init_watches(formula: Formula):
     clause2lits = defaultdict(list)
     
     for clause in formula:
-        if len(clause) == 1:
+        if len(clause) == 0:
+            # Skip empty clauses
+            continue
+        elif len(clause) == 1:
             # For unit clause, we watch the only literal
             lit2clauses[clause.literals[0]].append(clause)
             clause2lits[clause].append(clause.literals[0])
@@ -153,7 +168,7 @@ def cdcl_solve(formula: Formula) -> Optional[Assignments]:
     assignments = Assignments()
     lit2clauses, clause2lits = init_watches(formula)
     conflict_count = 0
-    first_arithmetic_term = 5
+    first_arithmetic_term = 1000
     common_difference = 1000
     difference_increment = 0
     
@@ -188,6 +203,13 @@ def cdcl_solve(formula: Formula) -> Optional[Assignments]:
                 
             # Handle conflicts by learning new clauses and restarting.
             conflict_count += 1
+            # Update activity scores of variables involved in the conflict
+            max_dl = max(assignments[lit.variable].dl for lit in clause)
+            for lit in clause:
+                var = lit.variable
+                if var in assignments:
+                    assignments.increment_activity(var, 1.0 / (math.pow(0.95, max_dl)))
+
             if conflict_count >= first_arithmetic_term + difference_increment * common_difference:
                 assignments = Assignments()
                 lit2clauses, clause2lits = init_watches(formula)
@@ -227,8 +249,22 @@ def all_variables_assigned(formula: Formula, assignments: Assignments) -> bool:
     return len(formula.variables()) == len(assignments)
 
 def branchingVariablePick(formula: Formula, assignments: Assignments) -> Tuple[int, bool]:
-    unassigned_vars = [var for var in formula.variables() if var not in assignments]
-    var = random.choice(unassigned_vars)
+    """
+    VSIDS heuristic for variable selection.
+    """
+    unassigned_vars = {var: 0.0 for var in formula.variables() if var not in assignments}
+    
+    # Compute variable activities based on the number of times they appeared in conflicts
+    for clause in formula.clauses:
+        max_dl_literals = [assignments[lit.variable].dl for lit in clause if lit.variable in assignments]
+        max_dl = max(max_dl_literals) if max_dl_literals else 0
+        for lit in clause:
+            var = lit.variable
+            if var in unassigned_vars:
+                unassigned_vars[var] += 1.0 / (math.pow(0.95, max_dl))
+    
+    # Select the variable with the highest activity score
+    var, activity = max(unassigned_vars.items(), key=lambda item: item[1])
     val = random.choice([True, False])
     return (var, val)
 
@@ -358,12 +394,18 @@ def parse_dimacs_cnf(content: str) -> Formula:
     parse the DIMACS cnf file format into corresponding Formula.
     """
     clauses = [Clause([])]
+    num_vars = 0
+    num_clauses = 0
+    
     for line in content.splitlines():
         # Skip comment lines
         if line.startswith('c'):
             continue
         tokens = line.split()
-        if len(tokens) != 0 and tokens[0] not in ("p", "c"):
+        if len(tokens) != 0 and tokens[0] == 'p':
+            num_vars = int(tokens[2])
+            num_clauses = int(tokens[3])
+        elif len(tokens) != 0 and tokens[0] not in ("p", "c"):
             for tok in tokens:
                 lit = int(tok)
                 if lit == 0:
@@ -372,6 +414,10 @@ def parse_dimacs_cnf(content: str) -> Formula:
                     var = abs(lit)
                     neg = lit < 0
                     clauses[-1].literals.append(Literal(var, neg))
+
+    # Handle the case where there are no variables and the only clause is an empty clause
+    if num_vars == 0 and num_clauses == 1 and len(clauses) == 1 and len(clauses[0]) == 0:
+        return Formula([Clause([])])
 
     if len(clauses[-1]) == 0:
         clauses.pop()
