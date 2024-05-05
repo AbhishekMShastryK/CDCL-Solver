@@ -2,6 +2,7 @@ import sys
 import random
 import time
 import math
+import textwrap
 from pprint import pprint
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Optional, Iterator
@@ -186,7 +187,7 @@ def cdcl_solve(formula: Formula) -> Optional[Assignments]:
     if reason == 'conflict':
         return None
 
-     # Main loop to assign values to variables.
+    # Main loop to assign values to variables.
     while not all_variables_assigned(formula, assignments):
         if time.time() - start_time > 90:  # Check if 90 seconds have passed
             print("Process terminated: Taking longer than 90 seconds.")
@@ -209,7 +210,8 @@ def cdcl_solve(formula: Formula) -> Optional[Assignments]:
                 var = lit.variable
                 if var in assignments:
                     assignments.increment_activity(var, 1.0 / (math.pow(0.95, max_dl)))
-
+            
+            # Handle conflicts by learning new clauses and restarting.
             if conflict_count >= first_arithmetic_term + difference_increment * common_difference:
                 assignments = Assignments()
                 lit2clauses, clause2lits = init_watches(formula)
@@ -234,7 +236,7 @@ def cdcl_solve(formula: Formula) -> Optional[Assignments]:
     return assignments # Return assignments if the formula is satisfiable.
 
 
-
+# Add learnt clauses
 def learntClauseAdd(formula, clause, assignments, lit2clauses, clause2lits):
     formula.clauses.append(clause)
     for lit in sorted(clause, key=lambda lit: -assignments[lit.variable].dl):
@@ -248,6 +250,7 @@ def learntClauseAdd(formula, clause, assignments, lit2clauses, clause2lits):
 def all_variables_assigned(formula: Formula, assignments: Assignments) -> bool:
     return len(formula.variables()) == len(assignments)
 
+# Pick variable for DECIDE
 def branchingVariablePick(formula: Formula, assignments: Assignments) -> Tuple[int, bool]:
     """
     VSIDS heuristic for variable selection.
@@ -268,7 +271,7 @@ def branchingVariablePick(formula: Formula, assignments: Assignments) -> Tuple[i
     val = random.choice([True, False])
     return (var, val)
 
-
+# BACKTRACK if conclict occurs
 def backtrack(assignments: Assignments, b: int):
     to_remove = []
     for var, assignment in assignments.items():
@@ -304,7 +307,7 @@ def clause_status(clause: Clause, assignments: Assignments) -> str:
     else:
         return 'unresolved'
 
-
+# Performs unit propagation using the watched literal data structures
 def unitpropagation(assignments, lit2clauses, clause2lits, topropagate: List[Literal]) -> Tuple[str, Optional[Clause]]:
     while len(topropagate) > 0:
         watching_lit = topropagate.pop().neg()
@@ -351,14 +354,11 @@ def unitpropagation(assignments, lit2clauses, clause2lits, topropagate: List[Lit
 
     return ('unresolved', None)
 
-
-
 def resolve(a: Clause, b: Clause, x: int) -> Clause:
     #Resolve two clauses on a variable x, removing x from the resulting clause.
     result = set(a.literals + b.literals) - {Literal(x, True), Literal(x, False)}
     result = list(result)
     return Clause(result)
-
 
 def conflict_analysis(clause: Clause, assignments: Assignments) -> Tuple[int, Clause]:
     """
@@ -445,8 +445,10 @@ if __name__ == '__main__':
         assert result.satisfy(formula)
         print(f"Execution time: {execution_time:.2f} seconds")
         print('Formula is SAT with assignments:')
-        assignments = {var: assignment.value for var, assignment in result.items()}
-        pprint(assignments)
+        assignments = sorted((var, assignment.value) for var, assignment in result.items())
+        assignment_strings = [f"{var}: {value}" for var, value in assignments]
+        wrapped_assignments = textwrap.wrap(', '.join(assignment_strings), width=80)
+        print('\n'.join(wrapped_assignments))
     else:
         print(f"Execution time: {execution_time:.2f} seconds")
         print('Formula is UNSAT.')
