@@ -3,10 +3,10 @@ import random
 import time
 import math
 import textwrap
-from pprint import pprint
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Optional, Iterator
 from collections import defaultdict
+import cProfile
 
 # frozen to be hashable
 ## Dataclasses for representing literals, clauses, formulas, and assignments
@@ -373,10 +373,14 @@ def conflict_analysis(clause: Clause, assignments: Assignments) -> Tuple[int, Cl
         # implied literals
         literals = filter(lambda lit: assignments[lit.variable].antecedent != None, literals)
 
-        # select any literal that meets the criterion
-        literal = next(literals)
-        antecedent = assignments[literal.variable].antecedent
-        clause = resolve(clause, antecedent, literal.variable)
+        try:
+            # select any literal that meets the criterion
+            literal = next(literals)
+            antecedent = assignments[literal.variable].antecedent
+            clause = resolve(clause, antecedent, literal.variable)
+        except StopIteration:
+            print("Error: Reached StopIteration in conflict_analysis, exiting. Change values of first_arithmetic_term and common_difference to 1 under cdcl_solve method")
+            sys.exit(1)
 
         # literals with current decision level
         literals = [literal for literal in clause if assignments[literal.variable].dl == assignments.dl]
@@ -436,7 +440,11 @@ if __name__ == '__main__':
         
     dimacs_cnf = open(sys.argv[1]).read()
     formula = parse_dimacs_cnf(dimacs_cnf)
+
     result = cdcl_solve(formula)
+
+    # uncomment below line to get execution time analysis by each functions and comment above line *result = cdcl_solve(formula)*
+    # cProfile.run('cdcl_solve(formula)', 'stats')
 
     end_time = time.time()
     execution_time = end_time - start_time
