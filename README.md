@@ -27,15 +27,27 @@ Run the python script
   Example: python .\CDCL_Solver.py .\project1-revised-tests\sat\block0.cnf
 ```
 
+Performance Analysis (optional)  
+To get analysis details uncomment *cProfile.run* command and execute *Performance_Analysis*.py  
+***Note: 'stats' is the generated file name***
 
-## Features
+```bash
+  python Performance_Analysis.py stats
+```
+## Optimizations
 
-- Implemented arithmetic restart policy for the existing code
-- Working on bug fixes for edge case scenarios
-- Analyzing impact of change in conflict threshold for restart policy
+- Implemented arithmetic restart policy
+- Implemented Variable State Independent Decaying Sum (VSIDS) heuristic
+- Bug fixes for edge case scenarios
+- Analyzing performance of testcases
+
+
+## Documentation
+
+[CDCL_Solver_Documentation](https://github.com/AbhishekMShastryK/CDCL-Solver/blob/main/CDCL_Solver_Documentation.pdf)
 
 
 ## Acknowledgements
 
- - [CDCL SAT Solver from Scratch](https://kienyew.github.io/CDCL-SAT-Solver-from-Scratch/CDCL-SAT-Solver-from-Scratch.html)
+[CDCL SAT Solver from Scratch](https://kienyew.github.io/CDCL-SAT-Solver-from-Scratch/CDCL-SAT-Solver-from-Scratch.html)
 
